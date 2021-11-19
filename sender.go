@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/smtp"
+	"strings"
 )
 
 // emailSender abstracts the connection and protocol conversation required to
@@ -45,6 +46,14 @@ func smtpExchange(m sendableMail, conn net.Conn, serverName string, tryTLSUpgrad
 		return err
 	}
 	defer func() { _ = c.Quit() }()
+
+	// https://support.google.com/a/answer/2956491?hl=en#zippy=%2Cturn-on-comprehensive-mail-storage%2Creview-sending-limits-for-the-smtp-relay-service
+	if strings.HasPrefix(serverName, "smtp-relay.gmail.com") {
+		comps := strings.Split(m.getFromAddr(), "@")
+		if len(comps) > 1 {
+			c.Hello(comps[1])
+		}
+	}
 
 	if tryTLSUpgrade {
 		if ok, _ := c.Extension("STARTTLS"); ok {
