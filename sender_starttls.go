@@ -3,6 +3,8 @@ package mailyak
 import (
 	"bytes"
 	"net"
+
+	"crypto/tls"
 )
 
 // senderWithStartTLS connects to the remote SMTP server, upgrades the
@@ -11,6 +13,9 @@ type senderWithStartTLS struct {
 	hostAndPort string
 	hostname    string
 	buf         *bytes.Buffer
+
+	// tlsConfig is always non-nil
+	tlsConfig *tls.Config
 }
 
 func (s *senderWithStartTLS) Send(m sendableMail) error {
@@ -20,10 +25,16 @@ func (s *senderWithStartTLS) Send(m sendableMail) error {
 	}
 	defer func() { _ = conn.Close() }()
 
-	return smtpExchange(m, conn, s.hostname, true)
+	return (&smtpExchange{
+		m:             m,
+		conn:          conn,
+		serverName:    s.hostname,
+		tryTLSUpgrade: true,
+		tlsConfig:     s.tlsConfig,
+	}).Do()
 }
 
-func newSenderWithStartTLS(hostAndPort string) *senderWithStartTLS {
+func newSenderWithStartTLS(hostAndPort string, tlsConfig *tls.Config) *senderWithStartTLS {
 	hostName, _, err := net.SplitHostPort(hostAndPort)
 	if err != nil {
 		// Really this should be an error, but we can't return it from the New()
@@ -39,9 +50,23 @@ func newSenderWithStartTLS(hostAndPort string) *senderWithStartTLS {
 		hostName = hostAndPort
 	}
 
+	if tlsConfig != nil {
+		// Clone the user-provided TLS config to prevent it being
+		// mutated by the caller.
+		tlsConfig = tlsConfig.Clone()
+	} else {
+		// If there is no TLS config provided, initialise a default.
+		//nolint:gosec // Maximum compatability but please use TLS >= 1.2
+		tlsConfig = &tls.Config{
+			ServerName: hostName,
+		}
+	}
+
 	return &senderWithStartTLS{
 		hostAndPort: hostAndPort,
 		hostname:    hostName,
 		buf:         &bytes.Buffer{},
+
+		tlsConfig: tlsConfig,
 	}
 }
