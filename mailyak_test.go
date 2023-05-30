@@ -28,7 +28,7 @@ func TestMailYakStringer(t *testing.T) {
 
 	mail.date = "a date"
 
-	want := "&MailYak{date: \"a date\", from: \"from@example.org\", fromName: \"From Example\", html: 31 bytes, plain: 42 bytes, toAddrs: [to@example.org], bccAddrs: [bcc1@example.org bcc2@example.org], subject: \"Test subject\", Precedence: \"bulk\", host: \"mail.host.com:25\", attachments (2): [{filename: test.html} {filename: test2.html}], auth set: true, explicit tls: false}"
+	want := "&MailYak{date: \"a date\", from: \"from@example.org\", fromName: \"From Example\", html: 31 bytes, plain: 42 bytes, toAddrs: [to@example.org], bccAddrs: [bcc1@example.org bcc2@example.org], subject: \"Test subject\", Precedence: [\"bulk\"], host: \"mail.host.com:25\", attachments (2): [{filename: test.html} {filename: test2.html}], auth set: true, explicit tls: false}"
 	got := fmt.Sprintf("%+v", mail)
 	if got != want {
 		t.Errorf("MailYak.String() = %v, want %v", got, want)
@@ -56,5 +56,39 @@ func TestMailYakDate(t *testing.T) {
 
 	if dateOne == dateTwo {
 		t.Errorf("MailYak.Send(): timestamp not updated: %v", dateOne)
+	}
+}
+
+// TestStripNames ensures that the stripNames() method correctly
+// remove the name part of a list of RFC 5322 addresses.
+func TestStripNames(t *testing.T) {
+	addresses := []string{
+		"a@example.com",
+		"b@example.com",
+		"invalid1",
+		"John Doe <c@example.com>",
+		"<d@example.com>",
+		"invalid2",
+	}
+
+	expected := map[string]struct{}{
+		"a@example.com": {},
+		"b@example.com": {},
+		"invalid1":      {},
+		"c@example.com": {},
+		"d@example.com": {},
+		"invalid2":      {},
+	}
+
+	result := stripNames(addresses)
+
+	if len(result) != len(expected) {
+		t.Fatalf("stripNames: Expected %d addresses, got %d: \n%v", len(expected), len(result), result)
+	}
+
+	for _, addr := range result {
+		if _, ok := expected[addr]; !ok {
+			t.Errorf("stripNames: Address %q was not expected", addr)
+		}
 	}
 }
