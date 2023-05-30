@@ -66,7 +66,7 @@ func (ex *smtpExchange) Do() error {
 			c.Hello(comps[1])
 		}
 	} else {
-		if localName := m.getLocalName(); localName != "" {
+		if localName := ex.m.getLocalName(); localName != "" {
 			if err := c.Hello(localName); err != nil {
 				return err
 			}
